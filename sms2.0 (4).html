@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>School Management System</title>
+<style>
+:root{--bg:#111827;--card:#1f2937;--text:#f9fafb;--primary:#4f46e5;--danger:#dc2626;}
+body{margin:0;font-family:Segoe UI;background:var(--bg);color:var(--text);}
+.card{background:var(--card);padding:20px;border-radius:12px;max-width:700px;margin:20px auto;}
+input,select{width:100%;padding:10px;margin:5px 0;border-radius:8px;border:none;background:#1f2937;color:#f9fafb;}
+button{padding:10px 16px;border:none;border-radius:8px;cursor:pointer;}
+button.primary{background:var(--primary);color:#fff;}
+button.danger{background:var(--danger);color:#fff;}
+table{width:100%;border-collapse:collapse;margin-top:10px;}
+th,td{padding:10px;border-bottom:1px solid #374151;text-align:center;}
+th{background:#374151;}
+.navbar button{margin-right:5px;}
+.hidden{display:none;}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div class="card" id="loginPage">
+<h2>Login</h2>
+<input id="username" placeholder="Username">
+<input id="password" type="password" placeholder="Password">
+<button class="primary" onclick="login()">Login</button>
+</div>
+
+<!-- DASHBOARD -->
+<div id="dashboard" class="hidden">
+<div class="card navbar">
+<button class="primary" onclick="showPage('studentsPage')">Students</button>
+<button class="primary" onclick="showPage('subjectsPage')">Subjects</button>
+<button class="primary" onclick="showPage('tasksPage')">Tasks</button>
+<button class="primary" onclick="showPage('attendancePage')">Attendance</button>
+<button class="danger" onclick="logout()">Logout</button>
+</div>
+
+<!-- STUDENTS -->
+<div class="card" id="studentsPage">
+<h3>Add Student</h3>
+<input id="sName" placeholder="Student Name">
+<select id="sSection"><option value="">Select Section</option><option>ICT-PROGRAMMING</option><option>G12-HUMSS</option><option>G12-ABM</option></select>
+<input id="sUsername" placeholder="Username">
+<input id="sPassword" placeholder="Password">
+<button class="primary" onclick="addStudent()">Save Student</button>
+
+<h3>Student List</h3>
+<table><thead><tr><th>Name</th><th>Section</th><th>Username</th><th>Actions</th></tr></thead>
+<tbody id="studentTable"></tbody></table>
+</div>
+
+<!-- SUBJECTS -->
+<div class="card hidden" id="subjectsPage">
+<h3>Add Subject to Student</h3>
+<select id="subStudent"><option value="">Select Student</option></select>
+<input id="subName" placeholder="Subject Name">
+<button class="primary" onclick="addSubject()">Save Subject</button>
+
+<h3>Subjects List</h3>
+<table><thead><tr><th>Student</th><th>Subject</th></tr></thead>
+<tbody id="subjectTable"></tbody></table>
+</div>
+
+<!-- TASKS -->
+<div class="card hidden" id="tasksPage">
+<h3>Add Task</h3>
+<select id="taskStudent"><option value="">Select Student</option></select>
+<select id="taskSubject"><option value="">Select Subject</option></select>
+<input id="taskName" placeholder="Task Name">
+<select id="taskStatus"><option>Not yet done</option><option>Done</option></select>
+<button class="primary" onclick="addTask()">Save Task</button>
+
+<h3>Tasks List</h3>
+<table><thead><tr><th>Student</th><th>Subject</th><th>Task</th><th>Status</th><th>Action</th></tr></thead>
+<tbody id="taskTable"></tbody></table>
+</div>
+
+<!-- ATTENDANCE -->
+<div class="card hidden" id="attendancePage">
+<h3>Mark Attendance</h3>
+<input type="date" id="aDate">
+<table><thead><tr><th>Name</th><th>Section</th><th>Status</th></tr></thead>
+<tbody id="attTable"></tbody></table>
+<button class="primary" onclick="saveAttendance()">Save Attendance</button>
+</div>
+</div>
+
+<!-- STUDENT DASHBOARD -->
+<div class="card hidden" id="studentPage">
+<h3>Welcome, <span id="studentName"></span></h3>
+<p>Section: <span id="studentSection"></span></p>
+<h4>Your Subjects & Tasks</h4>
+<table><thead><tr><th>Subject</th><th>Task</th><th>Status</th></tr></thead>
+<tbody id="studentTaskTable"></tbody></table>
+<h4>Your Attendance</h4>
+<table><thead><tr><th>Date</th><th>Status</th></tr></thead>
+<tbody id="studentAttTable"></tbody></table>
+<button class="danger" onclick="logout()">Logout</button>
+</div>
+
+<script>
+const API="https://script.google.com/macros/s/AKfycbwkMRT8nrAaYL_mJEfRSqTXSxmteXpMcpSSL8ZiGqF103At1wW4rwCwK284A8WCQtIN1Q/exec"; // Replace with your deployed Apps Script
+let students=[], subjects=[], tasks=[];
+
+// LOGIN
+async function login(){
+const u=username.value.trim(), p=password.value.trim();
+if(!u||!p){alert("Enter username & password");return;}
+const res=await fetch(API+"?action=login&username="+u+"&password="+p);
+const user=await res.json();
+if(user.status==="success"){
+loginPage.classList.add("hidden");
+if(user.role==="admin"){dashboard.classList.remove("hidden"); loadStudents(); loadSubjects(); loadTasks();}
+else{studentPage.classList.remove("hidden"); studentName.innerText=user.name; studentSection.innerText=user.section; loadStudentTasks(user.username); loadStudentAttendance(user.name);}
+}else alert(user.message||"Invalid username/password");
+}
+
+// NAVIGATION
+function showPage(p){['studentsPage','subjectsPage','tasksPage','attendancePage'].forEach(x=>document.getElementById(x).classList.add("hidden")); document.getElementById(p).classList.remove("hidden"); if(p==='attendancePage') loadAttendance();}
+function logout(){location.reload();}
+
+// STUDENTS
+async function loadStudents(){
+const res=await fetch(API+"?action=students"); students=await res.json();
+studentTable.innerHTML=""; subStudent.innerHTML="<option value=''>Select Student</option>"; taskStudent.innerHTML="<option value=''>Select Student</option>";
+students.forEach(s=>{studentTable.innerHTML+=`<tr><td>${s.name}</td><td>${s.section}</td><td>${s.username}</td><td><button onclick="deleteStudent('${s.id}')">Delete</button></td></tr>`; subStudent.innerHTML+=`<option value="${s.username}">${s.name}</option>`; taskStudent.innerHTML+=`<option value="${s.username}">${s.name}</option>`;}); loadSubjects(); loadTasks();
+}
+async function addStudent(){
+const name=sName.value.trim(), section=sSection.value, username=sUsername.value.trim(), password=sPassword.value.trim();
+if(!name||!section||!username||!password){alert("Complete all fields");return;}
+await fetch(API,{method:"POST",body:JSON.stringify({action:"addStudent",name,section,username,password})});
+sName.value=""; sSection.value=""; sUsername.value=""; sPassword.value=""; loadStudents();
+}
+async function deleteStudent(id){await fetch(API,{method:"POST",body:JSON.stringify({action:"deleteStudent",id})}); loadStudents(); loadSubjects(); loadTasks();}
+
+// SUBJECTS
+async function loadSubjects(){const res=await fetch(API+"?action=subjects"); subjects=await res.json(); subjectTable.innerHTML=""; taskSubject.innerHTML="<option value=''>Select Subject</option>"; subjects.forEach(s=>{subjectTable.innerHTML+=`<tr><td>${s.student}</td><td>${s.subject}</td></tr>`; taskSubject.innerHTML+=`<option value="${s.subject}">${s.subject}</option>`;});}
+async function addSubject(){const student=subStudent.value, subject=subName.value.trim(); if(!student||!subject){alert("Select student & enter subject");return;} await fetch(API,{method:"POST",body:JSON.stringify({action:"addSubject",student,subject})}); subName.value=""; loadSubjects(); loadTasks();}
+
+// TASKS
+async function loadTasks(){const res=await fetch(API+"?action=tasks"); tasks=await res.json(); taskTable.innerHTML=""; studentTaskTable.innerHTML=""; tasks.forEach((t,i)=>{taskTable.innerHTML+=`<tr><td>${t.student}</td><td>${t.subject}</td><td>${t.task}</td><td>${t.status}</td><td><button onclick="updateTask(${i})">Toggle</button></td></tr>`;});}
+async function addTask(){const student=taskStudent.value, subject=taskSubject.value, name=taskName.value.trim(), status=taskStatus.value;if(!student||!subject||!name){alert("Complete all fields");return;} const res=await fetch(API,{method:"POST",body:JSON.stringify({action:"addTask",student,subject,task:name,status})}); const data=await res.json(); if(data.status==="success"){taskName.value=""; loadTasks(); alert("Task added successfully");}else alert("Error adding task");}
+async function updateTask(id){const task=tasks[id]; const newStatus=task.status==="Done"?"Not yet done":"Done"; await fetch(API,{method:"POST",body:JSON.stringify({action:"updateTask",id,status:newStatus})}); loadTasks();}
+
+// ATTENDANCE
+async function loadAttendance(){attTable.innerHTML=""; students.forEach((s,i)=>attTable.innerHTML+=`<tr><td>${s.name}</td><td>${s.section}</td><td><select id="st${i}"><option>Present</option><option>Absent</option><option>Late</option></select></td></tr>`);}
+async function saveAttendance(){if(!aDate.value){alert("Select date");return;} const records=students.map((s,i)=>({date:aDate.value,name:s.name,section:s.section,status:document.getElementById("st"+i).value})); await fetch(API,{method:"POST",body:JSON.stringify({action:"saveAttendance",records})}); alert("Attendance saved");}
+
+// STUDENT DASHBOARD
+async function loadStudentTasks(username){const res=await fetch(API+"?action=tasks"); tasks=await res.json(); studentTaskTable.innerHTML=""; tasks.filter(t=>t.student===username).forEach(t=>studentTaskTable.innerHTML+=`<tr><td>${t.subject}</td><td>${t.task}</td><td>${t.status}</td></tr>`);}
+async function loadStudentAttendance(name){const res=await fetch(API+"?action=attendance"); const data=await res.json(); studentAttTable.innerHTML=""; data.filter(a=>a[1]===name).forEach(a=>{const d=new Date(a[0]).toLocaleDateString(); studentAttTable.innerHTML+=`<tr><td>${d}</td><td>${a[3]}</td></tr>`;});}
+</script>
+</body>
+</html>
